@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'update_checker.dart';
 import 'update_downloader.dart';
 
+import 'web_update_dialog.dart';
+
 /// Service terpusat untuk semua logika update.
 /// Singleton — satu instance dipakai di seluruh app.
 class UpdateService {
@@ -59,10 +61,32 @@ class UpdateService {
     }
   }
 
-  /// Cek versi web dan aktifkan notifikasi banner atas jika ada versi terbaru di server.
+  bool _isWebDialogOpen = false;
+  int? _lastPromptedWebBuild;
+
+  /// Cek versi web dan munculkan popup WebUpdateDialog serta banner atas jika ada versi baru di server.
   Future<void> checkAndPromptWebUpdate(BuildContext context, {bool force = false}) async {
     if (!kIsWeb) return;
-    await checkWebUpdate(force: force);
+    final result = await checkWebUpdate(force: force);
+    if (result != null && result.hasUpdate && context.mounted) {
+      final newBuild = result.manifest?.buildNumber;
+      // Jangan munculkan pop up berulang kali untuk build yang sama jika sedang terbuka
+      if (!_isWebDialogOpen && (force || newBuild != _lastPromptedWebBuild)) {
+        _isWebDialogOpen = true;
+        _lastPromptedWebBuild = newBuild;
+        try {
+          await WebUpdateDialog.show(
+            context,
+            currentVersion: result.currentVersion,
+            newVersion: result.manifest?.version ?? result.currentVersion,
+            currentBuildNumber: result.currentBuildNumber,
+            newBuildNumber: newBuild,
+          );
+        } finally {
+          _isWebDialogOpen = false;
+        }
+      }
+    }
   }
 
   // ─── Cek Update (dengan throttle & skip) ───

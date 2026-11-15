@@ -1,12 +1,19 @@
 {
-    "name": "PlanKP",
+    "id": "/",
+    "name": "PlanKP - Sistem Penjadwalan Maintenance",
     "short_name": "PlanKP",
-    "start_url": ".",
+    "description": "Sistem Penjadwalan & Realisasi Pemeliharaan Kencana Print",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "orientation": "portrait-primary",
     "background_color": "#285AC8",
     "theme_color": "#285AC8",
-    "description": "Sistem Penjadwalan & Realisasi Pemeliharaan (PlanKP)",
-    "orientation": "portrait-primary",
+    "lang": "id",
+    "categories": [
+        "business",
+        "productivity"
+    ],
     "prefer_related_applications": false,
     "icons": [
         {

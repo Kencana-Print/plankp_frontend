@@ -19,10 +19,12 @@
     <meta charset="UTF-8" />
     <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
     <meta name="description" content="Sistem Penjadwalan & Realisasi Pemeliharaan (PlanKP)" />
+    <meta name="theme-color" content="#285AC8" />
 
     <!-- iOS meta tags & icons -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="PlanKP" />
     <link rel="apple-touch-icon" href="icons/Icon-192.png" />
 
@@ -45,20 +47,69 @@
         touch-action: pan-x pan-y;
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
+        background-color: #F8FAFC;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      /* Splash screen loader PWA */
+      #pwa-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #F8FAFC;
+        z-index: 9999;
+        transition: opacity 0.3s ease-out;
+      }
+      #pwa-loading.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .pwa-spinner {
+        width: 44px;
+        height: 44px;
+        border: 4px solid #E2E8F0;
+        border-top: 4px solid #285AC8;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      .pwa-text {
+        margin-top: 16px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #1E293B;
+        letter-spacing: -0.2px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
     </style>
   </head>
   <body>
-    <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+    <div id="pwa-loading">
+      <div class="pwa-spinner"></div>
+      <div class="pwa-text">Memuat PlanKP...</div>
+    </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
     <script>
-      // Force hard reload: unregister service workers & clear caches agar kode/tampilan release baru langsung termuat
+      // Hilangkan splash loader setelah engine Flutter siap
+      window.addEventListener('flutter-first-frame', function () {
+        var loader = document.getElementById('pwa-loading');
+        if (loader) {
+          loader.classList.add('fade-out');
+          setTimeout(function () {
+            if (loader.parentNode) loader.parentNode.removeChild(loader);
+          }, 350);
+        }
+      });
+
+      // Force hard reload: Dipanggil saat user menekan tombol "Muat Ulang Sekarang"
       window.forceHardReload = async function () {
         try {
           if ('serviceWorker' in navigator) {
@@ -81,7 +132,7 @@
           console.warn('Gagal membersihkan cache/service worker:', e);
         }
 
-        // Navigasi ulang dengan cache-buster timestamp query agar browser mengambil bundle baru
+        // Muat ulang dengan query parameter cache-buster
         try {
           const url = new URL(window.location.href);
           url.searchParams.set('_v', Date.now().toString());
@@ -93,22 +144,6 @@
           window.location.reload();
         }
       };
-
-      // Otomatis unregister Service Worker & hapus cache lama langsung dari kode program
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          for (let registration of registrations) {
-            registration.unregister();
-          }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(function (names) {
-          for (let name of names) {
-            caches.delete(name);
-          }
-        });
-      }
     </script>
     <script src="flutter_bootstrap.js" async></script>
   </body>

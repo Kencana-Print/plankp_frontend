@@ -49,3 +49,6 @@ app.*.map.json
 
 # Environment configuration
 .env
+
+deploy-mobile.ps1
+deploy-web.ps1
