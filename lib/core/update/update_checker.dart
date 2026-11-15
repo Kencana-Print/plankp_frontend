@@ -132,15 +132,24 @@ class UpdateChecker {
     }
   }
 
+  static int? _runningWebBuildNumber;
+  static String? _runningWebVersion;
+
   /// Khusus Flutter Web: Cek apakah versi di server web lebih tinggi daripada versi yang sedang dibuka user.
   Future<AppUpdateCheckResult> checkWebUpdate() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
     final currentVersion = packageInfo.version;
 
+    // Inisialisasi versi runtime aplikasi web saat pertama kali dimuat
+    if (_runningWebBuildNumber == null && currentBuild > 0) {
+      _runningWebBuildNumber = currentBuild;
+      _runningWebVersion = currentVersion;
+    }
+
     final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-    // 1. Coba baca /version.json bawaan Flutter Web
+    // Cek ke /version.json bawaan Flutter Web di server
     try {
       final uri = Uri.parse('/version.json?t=$timestamp');
       final res = await _httpClient.get(uri, headers: const {'Accept': 'application/json'});
@@ -150,19 +159,32 @@ class UpdateChecker {
           final serverVersion = decoded['version']?.toString() ?? '';
           final serverBuild = int.tryParse(decoded['build_number']?.toString() ?? '') ?? 0;
 
-          final isHigherBuild = serverBuild > currentBuild;
-          final isDifferentVersion = serverVersion.isNotEmpty &&
-              currentVersion.isNotEmpty &&
-              serverVersion != currentVersion;
+          // Jika ini pertama kali dibuka dan PackageInfo tadi kosong/0, gunakan versi server saat ini
+          // sebagai baseline versi yang sedang aktif (bukan dianggap ada update baru)
+          if (_runningWebBuildNumber == null || _runningWebBuildNumber == 0) {
+            _runningWebBuildNumber = serverBuild > 0 ? serverBuild : currentBuild;
+            _runningWebVersion = serverVersion.isNotEmpty ? serverVersion : currentVersion;
+            return AppUpdateCheckResult(
+              status: AppUpdateStatus.upToDate,
+              currentVersion: _runningWebVersion ?? currentVersion,
+              currentBuildNumber: _runningWebBuildNumber ?? currentBuild,
+            );
+          }
 
-          if (isHigherBuild || (serverBuild == currentBuild && isDifferentVersion)) {
+          final baselineBuild = _runningWebBuildNumber!;
+          final baselineVersion = _runningWebVersion ?? currentVersion;
+
+          final isHigherBuild = serverBuild > baselineBuild;
+          final isHigherVersion = _isVersionHigher(serverVersion, baselineVersion);
+
+          if (isHigherBuild || (serverBuild == baselineBuild && isHigherVersion)) {
             return AppUpdateCheckResult(
               status: AppUpdateStatus.updateAvailable,
-              currentVersion: currentVersion,
-              currentBuildNumber: currentBuild,
+              currentVersion: baselineVersion,
+              currentBuildNumber: baselineBuild,
               manifest: AppUpdateManifest(
-                version: serverVersion.isNotEmpty ? serverVersion : currentVersion,
-                buildNumber: serverBuild > 0 ? serverBuild : currentBuild,
+                version: serverVersion.isNotEmpty ? serverVersion : baselineVersion,
+                buildNumber: serverBuild > 0 ? serverBuild : baselineBuild,
                 mandatory: false,
                 url: '',
               ),
@@ -172,32 +194,27 @@ class UpdateChecker {
       }
     } catch (_) {}
 
-    // 2. Fallback: Cek ke manifest /latest.json di VPS
-    try {
-      final uri = Uri.parse('$_manifestUrl?t=$timestamp');
-      final res = await _httpClient.get(uri, headers: const {'Accept': 'application/json'});
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        final decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic>) {
-          final manifest = AppUpdateManifest.fromJson(decoded);
-          if (manifest.buildNumber > currentBuild ||
-              (manifest.version.isNotEmpty && manifest.version != currentVersion)) {
-            return AppUpdateCheckResult(
-              status: AppUpdateStatus.updateAvailable,
-              manifest: manifest,
-              currentVersion: currentVersion,
-              currentBuildNumber: currentBuild,
-            );
-          }
-        }
-      }
-    } catch (_) {}
-
     return AppUpdateCheckResult(
       status: AppUpdateStatus.upToDate,
-      currentVersion: currentVersion,
-      currentBuildNumber: currentBuild,
+      currentVersion: _runningWebVersion ?? currentVersion,
+      currentBuildNumber: _runningWebBuildNumber ?? currentBuild,
     );
+  }
+
+  /// Memeriksa apakah format versi semantik baru (X.Y.Z) lebih tinggi dari versi lama
+  static bool _isVersionHigher(String newVer, String oldVer) {
+    if (newVer.isEmpty || oldVer.isEmpty || newVer == oldVer) return false;
+    try {
+      final newParts = newVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final oldParts = oldVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      for (int i = 0; i < 3; i++) {
+        final n = i < newParts.length ? newParts[i] : 0;
+        final o = i < oldParts.length ? oldParts[i] : 0;
+        if (n > o) return true;
+        if (n < o) return false;
+      }
+    } catch (_) {}
+    return false;
   }
 }
 
