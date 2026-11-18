@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -97,8 +98,20 @@ class RealisasiDetailSheet {
   }
 
   static Widget _fotoRow(String? realFoto) {
-    final url = (realFoto ?? '').trim();
+    var url = (realFoto ?? '').trim();
     if (url.isEmpty) return const SizedBox.shrink();
+
+    // 1. Normalisasi jika backend mengembalikan path relatif
+    if (url.startsWith('/')) {
+      final base = ApiConfig.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+      url = '$base$url';
+    }
+    // 2. Normalisasi jika domain pkp.manksi.com masih memakai http (agar tidak diblokir Mixed Content)
+    if (url.startsWith('http://pkp.manksi.com')) {
+      url = url.replaceFirst('http://pkp.manksi.com', 'https://pkp.manksi.com');
+    } else if (kIsWeb && url.startsWith('http://') && !url.contains('localhost') && !url.contains('127.0.0.1')) {
+      url = url.replaceFirst('http://', 'https://');
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
